@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "description": "It is backend folder of my college project",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon src/index.js"
   },
   "keywords": [
     "StyleSphere",
@@ -15,5 +17,8 @@
     "backend"
   ],
   "author": "Meshv Patel",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
 }
