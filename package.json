@@ -10,8 +10,7 @@
     "dev": "nodemon -r dotenv/config --experimental-json-modules src/index.js"
   },
   "keywords": [
-    "StyleSphere",
-    "ecommerce",
+    "Youtube",
     "react",
     "node",
     "backend"
