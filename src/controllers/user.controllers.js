@@ -333,8 +333,8 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
           $size: "$subscribedTo",
         },
         isSubscribed: {
-          $con: {
-            if: { $in: [req.user?._id, "subscribers.subscriber"] },
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
             then: true,
             else: false,
           },
@@ -366,7 +366,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 
 const getWatchHistory = asyncHandler(async (req, res) => {
   const user = User.aggregate([
-    { $match: new mongoose.Types.ObjectId(req.user) },
+    { $match: new mongoose.Types.ObjectId(req.user._id) },
     {
       $lookup: {
         from: "videos",
@@ -399,7 +399,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(200, req.user.watchHistory[0], "Watch History fetched successfully");
+    .json(200, user[0].watchHistory, "Watch History fetched successfully");
 });
 
 export {
@@ -413,4 +413,5 @@ export {
   updateUserAvatar,
   updateUserCoverImage,
   getUserChannelProfile,
+  getWatchHistory,
 };
