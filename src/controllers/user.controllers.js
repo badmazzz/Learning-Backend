@@ -1,7 +1,10 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.models.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  uploadOnCloudinary,
+  deleteFromCloudinary,
+} from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -241,15 +244,12 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   }
 
   //TODO: delete old image - assignment
-  await User.findByIdAndUpdate(
-    req.user?._id,
-    {
-      $set: {
-        avatar: "",
-      },
-    },
-    { new: true }
-  ).select("-password");
+  const oldUser = await User.findById(req.user?._id).select("avatar");
+  if (!user) 
+    throw new ApiError(404, "User not found");
+  
+
+  const oldAvatarUrl = oldUser.avatar;
 
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
@@ -266,6 +266,8 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     },
     { new: true }
   ).select("-password");
+
+  if (oldAvatarUrl) await deleteFromCloudinary(oldAvatarUrl);
 
   return res
     .status(200)
