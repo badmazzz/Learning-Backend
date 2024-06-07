@@ -1,6 +1,6 @@
 import mongoose, { isValidObjectId } from "mongoose";
-import { Video } from "../models/video.model.js";
-import { User } from "../models/user.model.js";
+import { Video } from "../models/videos.models.js";
+import { User } from "../models/user.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -41,7 +41,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
     description,
     videoFile: uploadVideo.url,
     thumbnail: uploadThumbnail.url,
-    user: req.user._id,
+    owner: req.user?._id,
   });
 
   res.status(201).json(new ApiResponse(200, video, "Video published"));
