@@ -15,7 +15,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
-  const { title, description } = req.body;
+  const { title, description, duration, views } = req.body;
 
   if (!title || !description)
     throw new ApiError(400, "Title or description required");
@@ -24,7 +24,6 @@ const publishAVideo = asyncHandler(async (req, res) => {
   const thumbnailLocalPath = req.files?.thumbnail[0]?.path;
 
   if (!videoLocalPath) throw new ApiError(400, "Video file not found");
-
   if (!thumbnailLocalPath) throw new ApiError(400, "Thumbnail file not found");
 
   const uploadVideo = await uploadOnCloudinary(videoLocalPath);
@@ -42,6 +41,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
     videoFile: uploadVideo.url,
     thumbnail: uploadThumbnail.url,
     owner: req.user?._id,
+    duration,
+    views
   });
 
   res.status(201).json(new ApiResponse(200, video, "Video published"));
