@@ -1,6 +1,9 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import { Video } from "../models/videos.models.js";
 import { User } from "../models/user.models.js";
+import { Comment } from "../models/comments.models.js";
+import { Like } from "../models/like.models.js";
+import { Playlist } from "../models/playlist.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -15,7 +18,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
-  const { title, description, duration, views } = req.body;
+  const { title, description, views } = req.body;
 
   if (!title || !description)
     throw new ApiError(400, "Title or description required");
@@ -41,7 +44,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
     videoFile: uploadVideo.url,
     thumbnail: uploadThumbnail.url,
     owner: req.user?._id,
-    duration,
+    duration: uploadVideo.duration,
     views
   });
 
@@ -120,7 +123,24 @@ const deleteVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found");
   }
 
-  await video.remove();
+  if (video.owner._id.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to delete this comment");
+  }
+
+  const comments = await Comment.find({ video: videoId });
+
+  const commentIds = comments.map(comment => comment._id);
+
+  await Like.deleteMany({ comment: { $in: commentIds } });
+
+  await Comment.deleteMany({ video: videoId });
+
+  await Playlist.updateMany(
+    { videos: videoId },
+    { $pull: { videos: videoId } }
+  );
+
+  await Video.deleteOne({_id: videoId});
 
   res
     .status(200)
