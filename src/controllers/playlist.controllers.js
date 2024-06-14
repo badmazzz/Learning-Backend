@@ -31,6 +31,83 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
 const getPlaylistById = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
   //TODO: get playlist by id
+  if (!isValidObjectId(playlistId)) throw new ApiError(400, "Invalid playlist");
+
+  const playlist = await Playlist.aggregate([
+    { $match: {_id: new mongoose.Types.ObjectId(playlistId)} },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "videos",
+        foreignField: "_id",
+        as: "videos",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullname: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $lookup: {
+              from: "likes",
+              localField: "_id",
+              foreignField: "video",
+              as: "likes",
+            },
+          },
+          {
+            $lookup: {
+              from: "comments",
+              localField: "_id",
+              foreignField: "video",
+              as: "comments",
+            },
+          },
+
+          { $unwind: "$owner" },
+          {
+            $addFields: {
+              likes: { $size: "$likes" },
+            },
+          },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [
+          {
+            $project: {
+              fullname: 1,
+              username: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    { $unwind: "$owner" },
+  ]);
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, playlist, "Playlist fetched successfully"));
 });
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
@@ -40,7 +117,12 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Please give valid id");
   }
 
-  const playlist = await Playlist.findByIdAndUpdate(
+  const playlist = await Playlist.findById(playlistId);
+
+  if (playlist.owner._id.toString() !== req.user?._id.toString())
+    throw new ApiError(403, "You are not authorized to delete this comment");
+
+  await Playlist.findByIdAndUpdate(
     playlistId,
     {
       $addToSet: {
@@ -68,84 +150,80 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
 
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
   const { playlistId, videoId } = req.params;
-    // TODO: remove video from playlist
-    if (!isValidObjectId(playlistId) || !isValidObjectId(videoId)) {
-      throw new ApiError(400, "plaese give valid video or playlist id");
-    }
+  // TODO: remove video from playlist
+  if (!isValidObjectId(playlistId) || !isValidObjectId(videoId)) {
+    throw new ApiError(400, "plaese give valid video or playlist id");
+  }
 
-    const playlist = await Playlist.findByIdAndUpdate(
-      playlistId,
-      {
-        $pull: {
-          videos: videoId,
-        },
+  const playlist = await Playlist.findByIdAndUpdate(
+    playlistId,
+    {
+      $pull: {
+        videos: videoId,
       },
-      {
-        new: true,
-      }
+    },
+    {
+      new: true,
+    }
+  );
+
+  if (!playlist)
+    throw new ApiError(500, "Error while removing video from playlist");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { isSuccess: true },
+        "Video removed from playlist successfully"
+      )
     );
-
-    if (!playlist)
-      throw new ApiError(500, "Error while removing video from playlist");
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          { isSuccess: true },
-          "Video removed from playlist successfully"
-        )
-      );
 });
 
 const deletePlaylist = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
-    // TODO: delete playlist
-    if (!isValidObjectId(playlistId)) {
-      throw new ApiError(400, "Invalid PlaylistId");
-    }
-    const playlist = await Playlist.findByIdAndDelete(playlistId);
+  // TODO: delete playlist
+  if (!isValidObjectId(playlistId)) {
+    throw new ApiError(400, "Invalid PlaylistId");
+  }
+  const playlist = await Playlist.findByIdAndDelete(playlistId);
 
-    if (!playlist) throw new ApiError(500, "Error while deleting Playlist");
+  if (!playlist) throw new ApiError(500, "Error while deleting Playlist");
 
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          { isDeleted: true },
-          "Playlist deleted successfully"
-        )
-      );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { isDeleted: true }, "Playlist deleted successfully")
+    );
 });
 
 const updatePlaylist = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
   const { name, description } = req.body;
-    //TODO: update playlist
-    if (!isValidObjectId(playlistId) || (!name && !description))
-      throw new ApiError(400, "Name and description required");
+  //TODO: update playlist
+  if (!isValidObjectId(playlistId) || (!name && !description))
+    throw new ApiError(400, "Name and description required");
 
-    const playlist = await Playlist.findById(playlistId);
-    if (!playlist) throw new ApiError(400, "No Playlist Found");
+  const playlist = await Playlist.findById(playlistId);
+  if (!playlist) throw new ApiError(400, "No Playlist Found");
 
-    playlist.name = name.trim();
-    playlist.description = description.trim();
+  playlist.name = name.trim();
+  playlist.description = description.trim();
 
-    // if (name) playlist.name = name;
-    // if (description) playlist.description = description;
+  // if (name) playlist.name = name;
+  // if (description) playlist.description = description;
 
-    const updatedPlaylist = await playlist.save();
+  const updatedPlaylist = await playlist.save();
 
-    if (!updatedPlaylist)
-      throw new ApiError(500, "Error while updating playlist");
+  if (!updatedPlaylist)
+    throw new ApiError(500, "Error while updating playlist");
 
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, updatedPlaylist, "Playlist Updated successfully")
-      );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, updatedPlaylist, "Playlist Updated successfully")
+    );
 });
 
 export {
