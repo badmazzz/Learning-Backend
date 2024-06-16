@@ -26,6 +26,65 @@ const createPlaylist = asyncHandler(async (req, res) => {
 const getUserPlaylists = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   //TODO: get user playlists
+  if (!isValidObjectId(userId)) throw new ApiError(400, "No user found");
+
+  const playlist = await Playlist.aggregate([
+    [
+      {
+        $lookup: {
+          from: "videos",
+          localField: "videos",
+          foreignField: "_id",
+          as: "videos",
+          pipeline: [
+            {
+              $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline: [
+                  {
+                    $project: {
+                      fullname: 1,
+                      username: 1,
+                      avatar: 1,
+                    },
+                  },
+                ],
+              },
+            },
+
+            { $unwind: "$owner" },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "owner",
+          foreignField: "_id",
+          as: "owner",
+          pipeline: [
+            {
+              $project: {
+                fullname: 1,
+                username: 1,
+                avatar: 1,
+              },
+            },
+          ],
+        },
+      },
+      { $unwind: "$owner" },
+    ],
+  ]);
+
+  if (!playlist) throw new ApiError(404, "No playlist found");
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, playlist, "Playlist fetched successfully"));
 });
 
 const getPlaylistById = asyncHandler(async (req, res) => {
@@ -34,7 +93,7 @@ const getPlaylistById = asyncHandler(async (req, res) => {
   if (!isValidObjectId(playlistId)) throw new ApiError(400, "Invalid playlist");
 
   const playlist = await Playlist.aggregate([
-    { $match: {_id: new mongoose.Types.ObjectId(playlistId)} },
+    { $match: { _id: new mongoose.Types.ObjectId(playlistId) } },
     {
       $lookup: {
         from: "videos",
@@ -104,6 +163,8 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     },
     { $unwind: "$owner" },
   ]);
+
+  if (!playlist) throw new ApiError(404, "No playlist found");
 
   res
     .status(200)
